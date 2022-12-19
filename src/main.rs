@@ -10,6 +10,7 @@ mod root_scene;
 mod level;
 mod enemy_repo;
 mod priority_queue;
+mod distance_field;
 
 use crate::kapp::*;
 

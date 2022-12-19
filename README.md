@@ -127,3 +127,9 @@ add decrease key to PQ
 then add the pq based distance marching thing and time the speedup
 
 it will be better for the AI if they avoid terrain as well
+
+correlate wandering of mobs
+move faster the more they are
+
+i understand the 1d 1d maybe
+push it along

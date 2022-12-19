@@ -19,3 +19,6 @@ cpal = "0.13.5"
 anyhow = "1.0.12"
 ordered-float = "3.4.0"
 itertools = "0.4.3"
+
+[profile.dev]
+opt-level = 3

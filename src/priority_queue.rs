@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 pub struct PriorityQueue<K: Ord + Clone, V: Clone + Eq + Hash,> {
-    heap: Vec<(K, V)>,
-    index_map: HashMap<V, usize>,
+    pub heap: Vec<(K, V)>,
+    pub index_map: HashMap<V, usize>,
 }
 
 impl <K: Ord + Clone,V: Clone + Eq + Hash> PriorityQueue<K, V> {

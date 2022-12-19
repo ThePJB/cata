@@ -1,6 +1,7 @@
 
 use crate::kmath::*;
 use crate::priority_queue::*;
+use crate::distance_field::*;
 use ordered_float::OrderedFloat;
 use itertools::Itertools;
 use std::f32::INFINITY;
@@ -167,7 +168,7 @@ impl Level {
     }
 
     // now with djikstra's algorithm
-    fn gen_distances(&mut self) {
+    fn gen_distances_newold(&mut self) {
         let tstart = SystemTime::now();
         self.dw = 800;
         self.dh = 800;
@@ -212,6 +213,7 @@ impl Level {
                 if any_open_neighbour {
                     pq.push(OrderedFloat(0.0f32), (i, j));
                 }
+                dtable[j*self.dw + i] = 0.0;
             }
 
         // initial set = all points where its a border
@@ -248,11 +250,11 @@ impl Level {
                 let ni = nx as usize;
                 let nj = ny as usize;
 
-                let nd = nd[n] * 1.0 / self.dw as f32 + d.0;
+                let nd = nd[n] + d.0;
                 if nd < dtable[nj*self.dw + ni] {
                     dtable[nj*self.dw + ni] = nd;
                     from_table[nj*self.dw + ni] = j*self.dw + i;
-                    pq.push(d + nd, (ni, nj));
+                    pq.push(OrderedFloat(nd), (ni, nj));
                 }
             }
             
@@ -262,6 +264,13 @@ impl Level {
         self.distances = dtable;
         let took = SystemTime::now().duration_since(tstart);
         println!("gen di took {:?}", took.unwrap());
+    }
+
+    pub fn gen_distances(&mut self) {
+        self.dw = 1600;
+        self.dh = 1600;
+        let f = |x, y| self.point(x, y).walkable;
+        self.distances = gen_distance_field_sep(f, self.dw, self.dh);
     }
 
     pub fn point(&self, x: f32, y: f32) -> PointProperties {
@@ -339,21 +348,24 @@ impl Level {
 
     // if we supply d threshold we can ray march with a certain clearance
     // maybe want to march by a bit less than d
-    pub fn ray_intersects_wall(&self, mut p1: Vec2, p2: Vec2) -> Option<f32> {
+    // we can probably handle edge of map and minimum res
+    // enforce safe
+    // and dont test past the end of the ray
+    pub fn ray_intersects_wall(&self, p1: Vec2, p2: Vec2) -> Option<f32> {
         let mut acc = 0.0;
         let u = p2 - p1;
         let umag = u.magnitude();
         let udir = u.normalize();
         loop {
-            let d = self.wall_distance(p1) * 0.8;
-            if d <= 0.0 {
-                return Some(acc)
-            }
             if acc >= umag {
                 return None
             }
+            let p = p1 + acc * udir;
+            let d = self.wall_distance(p);
+            if d <= 0.0 {
+                return Some(acc);
+            }
             acc += d;
-            p1 = p1 + d * udir;
         }
     }
 

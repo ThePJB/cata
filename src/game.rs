@@ -449,8 +449,8 @@ impl Demo for Game {
 
         // vignette
         // oh we are going to have fun
-        let vw = 200;
-        let vh = 200;
+        let vw = 400;
+        let vh = 400;
 
 
         let mut mask_vals = vec![0.0; vw * vh];
