@@ -27,6 +27,7 @@ pub struct Level {
     pub stairs_down: Vec2,
 
     pub distances: Vec<f32>,
+    pub walldirs: Vec<Vec2>,
     pub dw: usize,
     pub dh: usize,
 }
@@ -97,180 +98,11 @@ impl Level {
         self.gen_distances()
     }
 
-    // maybe we can get euclidean distance if everyone remembers their point of origination
-    fn gen_distances_old(&mut self) {
-        let tstart = SystemTime::now();
-
-        self.dw = 800;
-        self.dh = 800;
-
-        let mut distances = vec![INFINITY; self.dw * self.dh];
-
-        let mut queue = VecDeque::new();
-
-        for i in 0..self.dw {
-            for j in 0..self.dh {
-                let x = (i as f32 + 0.5) / self.dw as f32;
-                let y = (j as f32 + 0.5) / self.dh as f32;
-                let pp = self.point(x, y);
-                if !pp.walkable {
-                    queue.push_back((i, j, x, y))
-                }
-            }
-        }
-        while let Some((i, j, orig_x, orig_y)) = queue.pop_front() {
-            let x = (i as f32 + 0.5) / self.dw as f32;
-            let y = (j as f32 + 0.5) / self.dh as f32;
-
-            let dx = x - orig_x;
-            let dy = y - orig_y;
-
-            let d = (dx*dx + dy*dy).sqrt();
-
-            if d < distances[j*self.dw + i] {
-                distances[j*self.dw + i] = d;
-                // push neighbours
-                if i > 0 {
-                    // maybe only if its less than their distance
-                    if d < distances[j*self.dw + (i-1)] {
-                        distances[j*self.dw + i-1] = d + 1.0/self.dw as f32;
-                        queue.push_back((i - 1, j, orig_x, orig_y));
-                    }
-                }
-                if j > 0 {
-                    if d < distances[(j-1)*self.dw + (i)] {
-                        distances[(j-1)*self.dw + i] = d + 1.0/self.dw as f32;
-                        queue.push_back((i, j - 1, orig_x, orig_y));
-                    }
-                }
-                if i < self.dw - 1 {
-                    if d < distances[(j)*self.dw + (i+1)] {
-                        distances[j*self.dw + i+1] = d + 1.0/self.dw as f32;
-                        queue.push_back((i + 1, j, orig_x, orig_y));
-                    }
-                }
-                if j < self.dh - 1 {
-                    if d < distances[(j+1)*self.dw + (i)] {
-                        distances[(j+1)*self.dw + i] = d + 1.0/self.dw as f32;
-                        queue.push_back((i, j + 1, orig_x, orig_y));
-                    }
-                }
-            }
-        }
-        self.distances = distances;
-        // for i in 0..self.distances.len() {
-        //     self.distances[i] -= 1.0/self.dw as f32;
-        // }
-
-        // to ensure accuracy it could be the minimum of the distance at each corner
-        let took = SystemTime::now().duration_since(tstart);
-        println!("gen di old took {:?}", took.unwrap());
-    }
-
-    // now with djikstra's algorithm
-    fn gen_distances_newold(&mut self) {
-        let tstart = SystemTime::now();
-        self.dw = 800;
-        self.dh = 800;
-
-        let min_spacing = 1.0 / self.dw as f32;
-        let sentinel = usize::MAX;
-        let mut from_table = vec![sentinel; self.dw * self.dh];
-        let mut dtable = vec![INFINITY; self.dw * self.dh];
-        let mut pq = PriorityQueue::new();
-        for i in 0..self.dw {
-            for j in 0..self.dh {
-                let x = (i as f32 + 0.5) / self.dw as f32;
-                let y = (j as f32 + 0.5) / self.dh as f32;
-                let pp = self.point(x, y);
-
-                // skip open spaces
-                if pp.walkable {
-                    continue;
-                }
-
-                // if any 4neighbour has any alpha we divide by 2
-                let dx = [-1, 0, 1, 0, -1, -1, 1, 1];
-                let dy = [0, -1, 0, 1, -1, 1, -1, 1];
-
-                let mut any_open_neighbour = false;
-                
-                for n in 0..8 {
-                    let nx = i as i32 + dx[n];
-                    let ny = j as i32 + dy[n];
-                    if nx < 0 { continue; }
-                    if ny < 0 { continue; }
-                    if nx > self.dw as i32 - 1 { continue; }
-                    if ny > self.dh as i32 - 1 { continue; }
-
-                    let npp = self.point((nx as f32 + 0.5)/self.dw as f32, (ny as f32 + 0.5)/self.dh as f32);
-                    if npp.walkable {
-                        any_open_neighbour = true;
-                        break;
-                    }
-                }
-
-                if any_open_neighbour {
-                    pq.push(OrderedFloat(0.0f32), (i, j));
-                }
-                dtable[j*self.dw + i] = 0.0;
-            }
-
-        // initial set = all points where its a border
-        // oh shit jfa does look easy
-
-        // so I guess its any source for distance
-        // ok if they overtake each other
-        
-        // have a priority queue where shorter distances go first right?
-
-        // theres also JFA
-
-        // if every pixel has its nearest wall pixel
-        // or if every pixel knows which of its neighbours is the way to the nearest wall
-
-        // seb lagues algorithm is to compute a manhattany distance looking one with distance in x then distance in y
-        }
-
-        // how do I incorporate real euclidean distance into the djikstra part?
-        // will it fuck it up, not really it just gets stronger I think
-        while let Some((d, (i, j))) = pq.pop() {
-            let dx = [-1, 0, 1, 0, -1, -1, 1, 1];
-            let dy = [0, -1, 0, 1, -1, 1, -1, 1];
-            let nd = [min_spacing * 1.0, min_spacing * 1.0, min_spacing * 1.0, min_spacing * 1.0, min_spacing * SQRT_2, min_spacing * SQRT_2, min_spacing * SQRT_2, min_spacing * SQRT_2];
-            
-            for n in 0..8 {
-                let nx = i as i32 + dx[n];
-                let ny = j as i32 + dy[n];
-                if nx < 0 { continue; }
-                if ny < 0 { continue; }
-                if nx > self.dw as i32 - 1 { continue; }
-                if ny > self.dh as i32 - 1 { continue; }
-
-                let ni = nx as usize;
-                let nj = ny as usize;
-
-                let nd = nd[n] + d.0;
-                if nd < dtable[nj*self.dw + ni] {
-                    dtable[nj*self.dw + ni] = nd;
-                    from_table[nj*self.dw + ni] = j*self.dw + i;
-                    pq.push(OrderedFloat(nd), (ni, nj));
-                }
-            }
-            
-            // look at neighbours and put them in the queue if we have a better d for them, d should get newly evaluated for i and j or something though
-            // actually really easy so do it
-        }
-        self.distances = dtable;
-        let took = SystemTime::now().duration_since(tstart);
-        println!("gen di took {:?}", took.unwrap());
-    }
-
     pub fn gen_distances(&mut self) {
         self.dw = 1600;
         self.dh = 1600;
         let f = |x, y| self.point(x, y).walkable;
-        self.distances = gen_distance_field_sep(f, self.dw, self.dh);
+        (self.distances, self.walldirs) = gen_distance_field_sep(f, self.dw, self.dh);
     }
 
     pub fn point(&self, x: f32, y: f32) -> PointProperties {
@@ -316,7 +148,11 @@ impl Level {
         let outer_line = candidates.len() >= 2 && (candidates[0].0 == 0 || candidates[0].0 == self.w-1 || candidates[0].1 == 0 || candidates[0].1 == self.h-1) &&
             (candidates[1].0 == 0 || candidates[1].0 == self.w-1 || candidates[1].1 == 0 || candidates[1].1 == self.h-1);
             
-        let walkable = (!outer_line && on_line) || open_cell;
+
+        let obstructions = noise2d(x_orig * 32.0, y_orig * 32.0, self.seed.wrapping_mul(123412157)) > 0.8;
+        let obs_mask = noise2d(x_orig * 8.0, y_orig * 8.0, self.seed.wrapping_mul(10968547)) > 0.8;
+
+        let walkable = (!outer_line && on_line) || (open_cell && !(obstructions && obs_mask));
             
 
         PointProperties {
@@ -346,6 +182,27 @@ impl Level {
         d1.min(d2.min(d3.min(d4)))
     }
 
+    pub fn wall_dir(&self, p: Vec2) -> Vec2 {
+        if p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0 {
+            return Vec2::zero();
+        }
+        let xf = (self.dw-1) as f32 * p.x;
+        let yf = (self.dh-1) as f32 * p.y;
+
+        let i = xf.floor() as usize;
+        let j = yf.floor() as usize;
+
+        let d1 = self.walldirs[(j + 0) * self.dw + (i + 0)];
+        let d2 = self.walldirs[(j + 0) * self.dw + (i + 1)];
+        let d3 = self.walldirs[(j + 1) * self.dw + (i + 0)];
+        let d4 = self.walldirs[(j + 1) * self.dw + (i + 1)];
+
+        let xfrac = xf.fract();
+        let yfrac = yf.fract();
+
+        d1.lerp(d2, xfrac).lerp(d3.lerp(d4, xfrac), yfrac)
+    }
+
     // if we supply d threshold we can ray march with a certain clearance
     // maybe want to march by a bit less than d
     // we can probably handle edge of map and minimum res
@@ -367,6 +224,16 @@ impl Level {
             }
             acc += d;
         }
+    }
+
+    pub fn collide_circle(&self, p: Vec2, r: f32) -> Option<Vec2> {
+        let d = self.wall_distance(p);
+        let dir = self.wall_dir(p);
+        let overlap = r - d;
+        if overlap < 0.0 {
+            return None;
+        }
+        return Some(dir * overlap)
     }
 
     // ex: Vec<f32>,
@@ -418,6 +285,7 @@ impl Default for Level {
             stairs_up: Vec2::zero(),
             stairs_down: Vec2::zero(),
             distances: vec![],
+            walldirs: vec![],
             dw: 0,
             dh: 0,
         };

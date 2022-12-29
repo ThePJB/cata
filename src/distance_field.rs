@@ -162,7 +162,7 @@ where
     distances
 }
 
-pub fn gen_distance_field_sep<F>(f: F, w: usize, h: usize) -> Vec<f32> 
+pub fn gen_distance_field_sep<F>(f: F, w: usize, h: usize) -> (Vec<f32>, Vec<Vec2>)
 where 
     F: Fn(f32, f32)->bool
 {
@@ -170,6 +170,7 @@ where
 
     let mut distances = vec![INFINITY; w * h];
     let mut nearest = vec![(-1, -1); w*h];
+    let mut nearest_dir = vec![Vec2::zero(); w*h];
 
     // spread it
     // first set distrances, nearest to self 
@@ -200,18 +201,19 @@ where
                 if nearest[idx] == (-1, -1) || nearest[idx + w] == nearest[idx] {
                     continue;
                 }
-                let x = (i as f32 + 0.5) / w as f32;
                 let n_d = distances[idx + w];
+                
+                let neighbour_pos = Vec2::new((i as f32 + 0.5) / w as f32, ny);
+                let my_nearest = Vec2::new((nearest[idx].0 as f32 + 0.5) / w as f32, (nearest[idx].1 as f32 + 0.5) / h as f32);
 
-                let my_nearest_x = (nearest[idx].0 as f32 + 0.5) / w as f32;
-                let my_nearest_y = (nearest[idx].1 as f32 + 0.5) / h as f32;
+                let u = my_nearest - neighbour_pos;
 
-                let dx = my_nearest_x - x;
-                let dy = my_nearest_y - ny;
-                let d_to_mine = (dx*dx + dy*dy).sqrt();
+                let d_to_mine = u.magnitude();
+
                 if d_to_mine < n_d {
                     distances[idx + w] = d_to_mine;
                     nearest[idx + w] = nearest[idx];
+                    nearest_dir[idx + w] = u.normalize();
                 }
             }
         }
@@ -224,18 +226,15 @@ where
                 if nearest[idx] == (-1, -1)  || nearest[idx - w] == nearest[idx] {
                     continue;
                 }
-                let x = (i as f32 + 0.5) / w as f32;
                 let n_d = distances[idx - w];
-
-                let my_nearest_x = (nearest[idx].0 as f32 + 0.5) / w as f32;
-                let my_nearest_y = (nearest[idx].1 as f32 + 0.5) / h as f32;
-
-                let dx = my_nearest_x - x;
-                let dy = my_nearest_y - ny;
-                let d_to_mine = (dx*dx + dy*dy).sqrt();
+                let neighbour_pos = Vec2::new((i as f32 + 0.5) / w as f32, ny);
+                let my_nearest = Vec2::new((nearest[idx].0 as f32 + 0.5) / w as f32, (nearest[idx].1 as f32 + 0.5) / h as f32);
+                let u = my_nearest - neighbour_pos;
+                let d_to_mine = u.magnitude();
                 if d_to_mine < n_d {
                     distances[idx - w] = d_to_mine;
                     nearest[idx - w] = nearest[idx];
+                    nearest_dir[idx + w] = u.normalize();
                 }
             }
         }
@@ -251,16 +250,14 @@ where
                 }
                 let n_d = distances[idx + 1];
                 let nx = ((i + 1) as f32 + 0.5) / w as f32;
-
-                let my_nearest_x = (nearest[idx].0 as f32 + 0.5) / w as f32;
-                let my_nearest_y = (nearest[idx].1 as f32 + 0.5) / h as f32;
-
-                let dx = my_nearest_x - nx;
-                let dy = my_nearest_y - y;
-                let d_to_mine = (dx*dx + dy*dy).sqrt();
+                let my_nearest = Vec2::new((nearest[idx].0 as f32 + 0.5) / w as f32, (nearest[idx].1 as f32 + 0.5) / h as f32);
+                let neighbour_pos = Vec2::new(nx, y);
+                let u = my_nearest - neighbour_pos;
+                let d_to_mine = u.magnitude();
                 if d_to_mine < n_d {
                     distances[idx + 1] = d_to_mine;
                     nearest[idx + 1] = nearest[idx];
+                    nearest_dir[idx + w] = u.normalize();
                 }
             }
         }
@@ -275,16 +272,15 @@ where
                 }
                 let n_d = distances[idx - 1];
                 let nx = ((i - 1) as f32 + 0.5) / w as f32;
+                let my_nearest = Vec2::new((nearest[idx].0 as f32 + 0.5) / w as f32, (nearest[idx].1 as f32 + 0.5) / h as f32);
+                let neighbour_pos = Vec2::new(nx, y);
 
-                let my_nearest_x = (nearest[idx].0 as f32 + 0.5) / w as f32;
-                let my_nearest_y = (nearest[idx].1 as f32 + 0.5) / h as f32;
-
-                let dx = my_nearest_x - nx;
-                let dy = my_nearest_y - y;
-                let d_to_mine = (dx*dx + dy*dy).sqrt();
+                let u = my_nearest - neighbour_pos;
+                let d_to_mine = u.magnitude();
                 if d_to_mine < n_d {
                     distances[idx - 1] = d_to_mine;
                     nearest[idx - 1] = nearest[idx];
+                    nearest_dir[idx + w] = u.normalize();
                 }
             }
         }
@@ -306,7 +302,7 @@ where
     
     let took = SystemTime::now().duration_since(tstart);
     println!("gen sep took {:?}", took.unwrap());
-    distances
+    (distances, nearest_dir)
 }
 
 #[test]
@@ -346,7 +342,7 @@ fn test_distance_field() {
     }
     imbuf.dump_to_file("dtest2.png");
 
-    let distances = gen_distance_field_sep(f, w, h);
+    let distances = gen_distance_field_sep(f, w, h).0;
     let mut max = 0.0;
     for d in distances.iter() {
         max = max.max(*d);
@@ -375,7 +371,7 @@ fn test_dsep() {
         return true;
     };
 
-    let distances = gen_distance_field_sep(f, w, h);
+    let distances = gen_distance_field_sep(f, w, h).0;
     let mut max = 0.0;
     for d in distances.iter() {
         max = max.max(*d);

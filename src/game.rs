@@ -53,6 +53,7 @@ pub struct Game {
     enemy_type: Vec<usize>,
     enemy_last_attack: Vec<f32>,
     enemy_seed: Vec<u32>,
+    enemy_clip: Vec<i32>,
 
     enemies_pause: bool,
     repo: EnemyRepo
@@ -76,17 +77,18 @@ impl Game {
             }
         }
 
-        let difficulty = self.l.floor as f32 / 10.0;
-        println!(" advance level, {}", difficulty);
+
+
+        let density = 0.2 + self.l.floor as f32 * 0.1;
 
         // spawn enemies
-        let sw = 25;
-        let sh = 25;
+        let sw = 15;
+        let sh = 15;
         for i in 0..sw {
             for j in 0..sh {
                 let si = khash2i(i, j, self.l.seed * 124891247);
 
-                if chance(khash(self.seed * 1324147 + i as u32 * 124712547 + j as u32 * 131917), difficulty) {
+                if chance(khash(self.seed * 1324147 + i as u32 * 124712547 + j as u32 * 131917), density) {
                     let x = i as f32 / sw as f32;
                     let y = j as f32 / sh as f32;
                     
@@ -112,7 +114,7 @@ impl Game {
                             let er = self.repo.get(etype);
                             // spawn enemies
                             if !pp.walkable { continue; }
-                            if Vec2::new(x, y).dist(self.player_pos) < er.acquisition_radius {
+                            if Vec2::new(x, y).dist(self.player_pos) < 0.2 {
                                 continue;
                             }
 
@@ -146,6 +148,7 @@ impl Default for Game {
             enemy_v: Vec::new(),
             enemy_seed: Vec::new(),
             enemy_last_attack: Vec::new(),
+            enemy_clip: Vec::new(),
             enemies_pause: false,
             seed: SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or(Duration::from_nanos(34123123)).subsec_nanos(),
             repo: EnemyRepo::default(),
@@ -190,8 +193,8 @@ impl Demo for Game {
             let fg = Vec4::new(hue, FG_SAT, FG_VAL, 1.0).hsv_to_rgb();
             let bg = Vec4::new(hue, BG_SAT, BG_VAL, 1.0).hsv_to_rgb();
             
-            let w = 1000;
-            let h = 1000;
+            let w = 2000;
+            let h = 2000;
             let mut tb = TextureBuffer::new(w, h);
             for i in 0..w {
                 for j in 0..h {
@@ -223,14 +226,9 @@ impl Demo for Game {
 
         let pspeed = dt * PLAYER_SPEED;
         let new_pos = self.player_pos + pspeed * pv;
-        let pp = self.l.point(new_pos.x, new_pos.y);
-        if pp.walkable {
-            self.player_pos = new_pos;
-        } else {
-            let n = self.l.estimate_normal(new_pos, pspeed);
-            if let Some(n) = n {
-                self.player_pos = new_pos + n * pspeed;
-            }
+        self.player_pos = new_pos;
+        if let Some(pen) = self.l.collide_circle(self.player_pos, PLAYER_RADIUS) {
+            self.player_pos = self.player_pos - pen;
         }
 
         if !self.enemies_pause {
@@ -257,22 +255,14 @@ impl Demo for Game {
                 
                 let move_vec = self.enemy_v[i] * dt;
                 
-                let espeed = move_vec.magnitude();
-                let new_pos = self.enemy_pos[i] + move_vec;
-                
+                self.enemy_pos[i] = self.enemy_pos[i] + move_vec;
 
                 // collide with terrain
-                let pp = self.l.point(new_pos.x, new_pos.y);
-                if pp.walkable {
-                    self.enemy_pos[i] = new_pos;
-                } else {
+                if let Some(pen) = self.l.collide_circle(self.enemy_pos[i], er.radius) {
                     if er.is_projectile {
                         self.enemy_kill[i] = true;
                     } else {
-                        let n = self.l.estimate_normal(new_pos, espeed);
-                        if let Some(n) = n {
-                            self.enemy_pos[i] = new_pos + n * espeed;
-                        }
+                        self.enemy_pos[i] = self.enemy_pos[i] - pen;
                     }
                 }
             }
@@ -329,7 +319,24 @@ impl Demo for Game {
             let etype = self.enemy_type[i];
             let er = self.repo.get(etype);
             let u = self.player_pos - self.enemy_pos[i];
-            if er.projectile > -1 && u.magnitude() < er.shoot_range && (self.t - self.enemy_last_attack[i]) > er.projectile_cooldown {   // & cast a ray to see if theres vision
+
+            let mut can_shoot = true;
+            if er.projectile == -1 {can_shoot = false}
+            if u.magnitude() > er.shoot_range {can_shoot = false}
+            if self.enemy_clip[i] == 0 {
+                if self.t - self.enemy_last_attack[i] < er.clip_reload {
+                    can_shoot = false;
+                } else {
+                    self.enemy_clip[i] = er.clip_size;
+                }
+            }
+            if self.t - self.enemy_last_attack[i] < er.projectile_cooldown {
+                can_shoot = false
+            }
+            // also block if raycast to play is failed
+
+
+            if can_shoot {   
                 let mut dir = u.normalize();
                 if etype == 9 {
                     dir = Vec2::new(dir.y, dir.x);
@@ -339,6 +346,9 @@ impl Demo for Game {
                 let si = self.enemy_seed[i];
                 self.spawn_enemy(spawn_etype, ser.initial_hp, self.enemy_pos[i], dir * ser.speed_to_target, si);
                 self.enemy_last_attack[i] = self.t;
+                if er.clip_size != -1 {
+                    self.enemy_clip[i] -= 1;
+                }
             }
         }
         
@@ -409,46 +419,7 @@ impl Demo for Game {
         outputs.canvas.put_rect(stairs_down_rect.child(0.33, 0.33, 0.33, 1.0 - 0.33), 1.3, stair_colour);
         outputs.canvas.put_rect(stairs_down_rect.child(0.66, 0.66, 1.0 - 0.66, 1.0 - 0.66), 1.3, stair_colour);
 
-
-        // // vignette
-        // let vw = 100;
-        // let vh = 100;
-        // let mut tb = TextureBuffer::new(vw, vh);
-
-        // let targets = 
-        //     (0..vw).zip(repeat(0).take(vw)).chain(
-        //     (0..vw).zip(repeat(vh - 1).take(vw)).chain(
-        //     repeat(0).zip(0..vh).chain(
-        //     repeat(vw - 1).zip(0..vh))));
-
-        // for (targ_i, targ_j) in targets {
-        //         let p = Vec2::new(i as f32 / vw as f32, j as f32 / vh as f32);
-        //         let world_pos = p.transform(Rect::unit(), self.camera);
-        //         // conduct raycast
-        //         let stride = 0.01;
-        //         let mut colour = Vec4::new(0.0, 0.0, 0.0, 0.0);
-        //         let mut d = 0.00;
-        //         let u = world_pos - self.player_pos;
-        //         loop {
-        //             let pos = self.player_pos + d * u.normalize();
-        //             d += stride;
-        //             let pp = self.l.point(pos.x, pos.y);
-        //             if !pp.walkable {
-        //                 colour = Vec4::new(0.0, 0.0, 0.0, 0.9);
-        //                 break;
-        //             }
-        //             if d >= u.magnitude() {
-        //                 break;
-        //             }
-        //         }
-        //         tb.set(i as i32, vh as i32 - j as i32 - 1, colour)
-        //     }
-        // }
-        // outputs.set_texture.push((tb, 1));
-        // outputs.draw_texture.push((inputs.screen_rect, 1, 2.5));
-
         // vignette
-        // oh we are going to have fun
         let vw = 400;
         let vh = 400;
 
@@ -533,6 +504,7 @@ impl Game {
         self.enemy_last_attack = Vec::new();
         self.enemy_type = Vec::new();
         self.enemy_seed = Vec::new();
+        self.enemy_clip = Vec::new();
     }
 
     pub fn cull_enemies(&mut self) {
@@ -550,6 +522,7 @@ impl Game {
                 self.enemy_v.swap_remove(i);
                 self.enemy_last_attack.swap_remove(i);
                 self.enemy_seed.swap_remove(i);
+                self.enemy_clip.swap_remove(i);
             }
         }
     }
@@ -561,7 +534,8 @@ impl Game {
         self.enemy_hp.push(hp);
         self.enemy_last_attack.push(-100.0);
         self.enemy_pos.push(pos);
-        self.enemy_seed.push(seed)
+        self.enemy_seed.push(seed);
+        self.enemy_clip.push(0);
     }
 }
 
@@ -583,17 +557,6 @@ impl Game {
                     break;
                 }
                 laser_t += dist;
-
-                // let pp = self.l.point(p.x, p.y);
-                // if pp.walkable {
-                //     laser_t += self.l.wall_distance(p);
-                //     // laser_t += stride;
-                // } else {
-                //     stride /= 2.0;
-                // }
-                // if stride <= 0.0001 {
-                //     break;
-                // }
             }
 
             let mut nearest_enemy_t = INFINITY;
@@ -608,7 +571,7 @@ impl Game {
                 let proj = x*laser_dir;
                 let laser_to_enemy = player_to_enemy - proj;
                 
-                if laser_to_enemy.magnitude() < LASER_W + er.radius && player_to_enemy.magnitude() < laser_t {
+                if laser_to_enemy.magnitude() < LASER_W + er.radius && player_to_enemy.magnitude() < laser_t && player_to_enemy.magnitude() < nearest_enemy_t{
                     nearest_enemy_t = player_to_enemy.magnitude();
                     nearest_enemy_id = Some(i);
                 }
@@ -650,6 +613,3 @@ impl Game {
         }
     }
 }
-
-
-// definitely pre compute a distance field and flood fill it for raymarching

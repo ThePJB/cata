@@ -21,6 +21,9 @@ pub struct EnemyRecord {
     pub projectile: i32,
     pub projectile_cooldown: f32,
 
+    pub clip_size: i32,
+    pub clip_reload: f32,
+
     pub colour_inner: Vec4,
     pub colour_outer: Vec4,
 }
@@ -40,6 +43,9 @@ impl Default for EnemyRecord {
             shoot_range: 0.0,
             projectile: -1,
             projectile_cooldown: 1.0,
+
+            clip_size: -1,
+            clip_reload: 0.0,
 
             colour_inner: Vec4::new(1.0, 1.0, 1.0, 1.0),
             colour_outer: Vec4::new(0.0, 0.0, 0.0, 1.0),
@@ -161,19 +167,42 @@ impl Default for EnemyRepo {
         easy_shooter.projectile_cooldown = 2.5;
         let easy_shooter_id = repo.push(easy_shooter);
 
+        let mut death_missile = easy_bullet;
+        death_missile.colour_inner = Vec4::grey(0.1);
+        death_missile.speed_to_target = 0.03;
+        let death_missile_id = repo.push(death_missile);
+
+        let mut deathcaster = easy_shooter;
+        deathcaster.colour_inner = Vec4::grey(0.1);
+        deathcaster.projectile_cooldown = 0.2;
+        deathcaster.clip_size = 5;
+        deathcaster.clip_reload = 2.5;
+        deathcaster.radius = 0.005;
+        deathcaster.initial_hp = 2.0;
+        deathcaster.projectile = death_missile_id as i32;
+        let deathcaster_id = repo.push(deathcaster);
+
         let easy_pack = vec![(easy_guy_id, 6)];
         let easy_shooter_pack = vec![(easy_shooter_id, 6)];
         let easy_mixed_pack = vec![(easy_shooter_id, 3), (easy_guy_id, 3)];
-        let easy_big_pack = vec![(easy_shooter_id, 6), (easy_guy_id, 6)];
+        let dc_pack = vec![(easy_shooter_id, 2), (easy_guy_id, 3), (deathcaster_id, 1)];
         
         repo.spawn_table.push(easy_pack);
         repo.spawn_table.push(easy_shooter_pack);
-        repo.spawn_table.push(easy_big_pack);
+        repo.spawn_table.push(dc_pack);
         repo.spawn_table.push(easy_mixed_pack);
 
         repo
     }
 }
+
+
+// enemy data
+// makes sense to define a pack repo here as well where packs are composed and have start, end levels specified as well as # of slots in the table ie for more or less common
+// alternatively i could define specific ones for each level, but it wouldnt be as varied
+// or I could have options for each level
+// and what about having notable packs in the centers of the open areas
+
 
 // const NUM_ENEMY_TYPES: usize = 11;
 

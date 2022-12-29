@@ -1,3 +1,14 @@
+# CataCleanser
+Fix collision
+do I need distance field normals as well
+
+ok i mean its really easy to clip through especially if you go up for some reason
+
+maybe i should experiment with some SDFs and have it be super clean
+SDFs with normal
+SDF of noise?
+
+
 * enemy types
     * ghost
     * shooter
@@ -133,3 +144,15 @@ move faster the more they are
 
 i understand the 1d 1d maybe
 push it along
+
+
+// ok nice it works
+i can put shot spread
+and bool leads shot as well
+
+
+
+
+fixed one laser bug but it still sometimes multikills other enemies...
+not sure if its an ID thing
+also walking in walls
