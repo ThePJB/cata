@@ -156,3 +156,12 @@ and bool leads shot as well
 fixed one laser bug but it still sometimes multikills other enemies...
 not sure if its an ID thing
 also walking in walls
+
+
+try the class thing
+try the basic roguelike thing (less work)
+whats more fun
+
+melee attacks prety esily parameterised
+
+probably player would be well oriented with a little hud that has name, class, abilities, health, etc

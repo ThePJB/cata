@@ -80,6 +80,13 @@ impl Game {
 
 
         let density = 0.2 + self.l.floor as f32 * 0.1;
+        let st_len = if self.l.floor == 1 {
+            4
+        } else if self.l.floor == 2 {
+            5
+        } else {
+            6
+        };
 
         // spawn enemies
         let sw = 15;
@@ -97,7 +104,7 @@ impl Game {
                     
                     let pp = self.l.point(x, y);
                     if pp.gtype == STAIRS_DOWN { continue; }
-                    let packdesc = self.repo.spawn_table[khash(si * 2312317) as usize % self.repo.spawn_table.len()].clone();
+                    let packdesc = self.repo.spawn_table[khash(si * 2312317) as usize % st_len].clone();
                     let pack_range = 0.04;
 
                     for (etype, qty) in packdesc {

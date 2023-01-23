@@ -187,10 +187,15 @@ impl Default for EnemyRepo {
         let easy_mixed_pack = vec![(easy_shooter_id, 3), (easy_guy_id, 3)];
         let dc_pack = vec![(easy_shooter_id, 2), (easy_guy_id, 3), (deathcaster_id, 1)];
         
+        let swarm_host_pack = vec![(swarm_host_id, 1), (locust_id, 3)];
+        let rusher_pack = vec![(rusher_id, 3)];
+        
         repo.spawn_table.push(easy_pack);
         repo.spawn_table.push(easy_shooter_pack);
         repo.spawn_table.push(dc_pack);
         repo.spawn_table.push(easy_mixed_pack);
+        repo.spawn_table.push(rusher_pack);
+        repo.spawn_table.push(swarm_host_pack);
 
         repo
     }
